@@ -418,8 +418,6 @@ function setup() {
     font-family: Arial, Helvetica, sans-serif;
   }
 
-  /* VENTANA DE REALIDAD AUMENTADA */
-
   .boton-ar {
     border: 0;
     font-family: Arial, Helvetica, sans-serif;
@@ -659,7 +657,7 @@ function setup() {
   }
   </style>
 
-  <header class="barra">
+<header class="barra">
     <div class="logo">TPFINAL</div>
   </header>
 
@@ -974,7 +972,7 @@ function setup() {
   </div>
   `;
 
-  document.querySelectorAll('img').forEach(function(img) {
+document.querySelectorAll('img').forEach(function(img) {
     img.addEventListener('error', function() {
       this.style.background = '#18243a';
       this.style.minHeight = '150px';
@@ -1042,6 +1040,7 @@ function setup() {
 
     async function iniciarExperiencia() {
       if (iniciando || experiencia) return;
+
       iniciando = true;
       boton.disabled = true;
       mensaje.textContent = 'Preparando el modelo 3D y la cámara…';
@@ -1072,7 +1071,7 @@ function setup() {
         const anchor = experiencia.addAnchor(0);
 
         anchor.onTargetFound = () => {
-          estado.textContent = '¡PÁGINA RECONOCIDA! Spider-Man está sobre el cómic.';
+          estado.textContent = '¡PÁGINA RECONOCIDA! Spider-Man se balancea con una telaraña elástica.';
         };
 
         anchor.onTargetLost = () => {
@@ -1088,6 +1087,7 @@ function setup() {
 
         const gltf = resultados[0];
         const modelo = gltf.scene;
+
         const caja = new THREE.Box3().setFromObject(modelo);
         const tamano = new THREE.Vector3();
         const centro = new THREE.Vector3();
@@ -1107,28 +1107,154 @@ function setup() {
           );
         }
 
+        // FISICA: Spider-Man queda suspendido de una telaraña elastica.
+        // La gravedad lo hace caer, la telaraña lo recupera y la amortiguacion
+        // reduce el movimiento de forma progresiva.
+
+        const puntoSujecion = new THREE.Vector3(0, 1.45, 0);
+        const posicionModelo = new THREE.Vector3(0.20, 0.05, 0.10);
+        const velocidadModelo = new THREE.Vector3(0, 0, 0);
+        const gravedad = new THREE.Vector3(0, -2.2, 0);
+
+        const largoNatural = 1.05;
+        const elasticidad = 16;
+        const amortiguacion = 3.2;
+        const alturaSujecion = 0.55;
+
+        modelo.position.copy(posicionModelo);
         anchor.group.add(modelo);
 
-        renderer.setAnimationLoop(() => {
+        // Hilo visible que une el punto de sujecion con Spider-Man.
+
+        const geometriaTelarana = new THREE.BufferGeometry();
+        const verticesTelarana = new Float32Array(6);
+
+        geometriaTelarana.setAttribute(
+          'position',
+          new THREE.BufferAttribute(verticesTelarana, 3)
+        );
+
+        const materialTelarana = new THREE.LineBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.9
+        });
+
+        const telarana = new THREE.Line(
+          geometriaTelarana,
+          materialTelarana
+        );
+
+        anchor.group.add(telarana);
+
+        let ultimoTiempo = 0;
+
+        renderer.setAnimationLoop((tiempo) => {
+
+          // Evita saltos grandes si el navegador pausa la pestaña.
+
+          let delta = ultimoTiempo === 0
+            ? 0.016
+            : (tiempo - ultimoTiempo) / 1000;
+
+          ultimoTiempo = tiempo;
+          delta = Math.min(delta, 0.033);
+
+          // Punto del cuerpo donde se engancha la telaraña.
+
+          const puntoModelo = new THREE.Vector3(
+            modelo.position.x,
+            modelo.position.y + alturaSujecion,
+            modelo.position.z
+          );
+
+          // Fuerza elastica: cuanto mas se estira el hilo,
+          // mas tira hacia el punto de sujecion.
+
+          const direccion = new THREE.Vector3().subVectors(
+            puntoSujecion,
+            puntoModelo
+          );
+
+          const distancia = direccion.length();
+
+          if (distancia > 0.0001) {
+            direccion.normalize();
+          }
+
+          const estiramiento = distancia - largoNatural;
+
+          const fuerzaElastica = direccion.multiplyScalar(
+            estiramiento * elasticidad
+          );
+
+          const fuerzaAmortiguacion = velocidadModelo.clone().multiplyScalar(
+            -amortiguacion
+          );
+
+          const aceleracion = gravedad.clone()
+            .add(fuerzaElastica)
+            .add(fuerzaAmortiguacion);
+
+          // Integracion de la velocidad y la posicion.
+
+          velocidadModelo.addScaledVector(aceleracion, delta);
+          modelo.position.addScaledVector(velocidadModelo, delta);
+
+          // La inclinacion acompaña el balanceo.
+
+          modelo.rotation.z = -velocidadModelo.x * 0.16;
+          modelo.rotation.x = velocidadModelo.z * 0.12;
+
+          // Actualiza la telaraña en cada cuadro.
+
+          const puntoEnganche = new THREE.Vector3(
+            modelo.position.x,
+            modelo.position.y + alturaSujecion,
+            modelo.position.z
+          );
+
+          const posiciones = geometriaTelarana.attributes.position.array;
+
+          posiciones[0] = puntoSujecion.x;
+          posiciones[1] = puntoSujecion.y;
+          posiciones[2] = puntoSujecion.z;
+
+          posiciones[3] = puntoEnganche.x;
+          posiciones[4] = puntoEnganche.y;
+          posiciones[5] = puntoEnganche.z;
+
+          geometriaTelarana.attributes.position.needsUpdate = true;
+
           renderer.render(scene, camera);
         });
 
         pantalla.style.display = 'none';
         hud.style.display = 'block';
         botonCerrar.style.display = 'block';
+
         estado.textContent = 'Apuntá la cámara a la página del cómic…';
 
       } catch (error) {
+
         console.error('Error al iniciar la realidad aumentada:', error);
 
-        const detalle = error && error.message ? error.message : String(error);
+        const detalle = error && error.message
+          ? error.message
+          : String(error);
 
-        if (detalle.toLowerCase().includes('target') ||
-            detalle.toLowerCase().includes('mind')) {
+        if (
+          detalle.toLowerCase().includes('target') ||
+          detalle.toLowerCase().includes('mind')
+        ) {
           mensaje.textContent = 'Falta data/targets.mind. Generá ese archivo con una foto de la página del cómic y guardalo en la carpeta data.';
-        } else if (detalle.toLowerCase().includes('camera') ||
-                   detalle.toLowerCase().includes('permission')) {
+
+        } else if (
+          detalle.toLowerCase().includes('camera') ||
+          detalle.toLowerCase().includes('permission')
+        ) {
           mensaje.textContent = 'No se pudo acceder a la cámara. Aceptá el permiso y abrí la página con HTTPS desde el celular.';
+
         } else {
           mensaje.textContent = 'No se pudo iniciar. Revisá que data/spiderman.glb y data/targets.mind existan, que haya internet y que la página use HTTPS. Detalle: ' + detalle;
         }
@@ -1150,6 +1276,7 @@ function setup() {
     boton.addEventListener('click', iniciarExperiencia);
 
     document.addEventListener('cerrar-ar-interno', () => {
+
       if (experiencia) {
         try {
           experiencia.renderer.setAnimationLoop(null);
@@ -1164,15 +1291,20 @@ function setup() {
       contenedor.innerHTML = '';
       iniciando = false;
       boton.disabled = false;
+
       pantalla.style.display = 'flex';
       hud.style.display = 'none';
       botonCerrar.style.display = 'none';
+
       mensaje.textContent = 'Cámara cerrada. Podés volver a intentarlo.';
     });
 
     window.addEventListener('resize', () => {
       if (experiencia) {
-        experiencia.renderer.setSize(window.innerWidth, window.innerHeight);
+        experiencia.renderer.setSize(
+          window.innerWidth,
+          window.innerHeight
+        );
       }
     });
   `;
@@ -1180,7 +1312,10 @@ function setup() {
   document.body.appendChild(moduloAR);
 
   document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape' && overlayAR.style.display === 'block') {
+    if (
+      event.key === 'Escape' &&
+      overlayAR.style.display === 'block'
+    ) {
       cerrarAR();
     }
   });
