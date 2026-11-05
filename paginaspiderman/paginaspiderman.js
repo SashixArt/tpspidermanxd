@@ -1039,7 +1039,6 @@ function setup() {
 
     let experiencia = null;
     let iniciando = false;
-    let grupoParticulas = null;
 
     async function iniciarExperiencia() {
       if (iniciando || experiencia) return;
@@ -1073,14 +1072,14 @@ function setup() {
         const anchor = experiencia.addAnchor(0);
 
         anchor.onTargetFound = () => {
-          estado.textContent = '¡PÁGINA RECONOCIDA! Spider-Man y las partículas están sobre el cómic.';
+          estado.textContent = '¡PÁGINA RECONOCIDA! Spider-Man está sobre el cómic.';
         };
 
         anchor.onTargetLost = () => {
           estado.textContent = 'No veo la página. Volvé a apuntar a la historieta.';
         };
 
-        mensaje.textContent = 'Aceptá el permiso de cámara si aparece. Estamos preparando todo…';
+        mensaje.textContent = 'Aceptá el permiso de cámara si aparece. Estamos preparando Spider-Man…';
 
         const loader = new GLTFLoader();
         const promesaCamara = experiencia.start();
@@ -1110,45 +1109,7 @@ function setup() {
 
         anchor.group.add(modelo);
 
-        // CREAR LAS BOLITAS DE COLORES EN 3D FLOTANDO ALREDEDOR DE SPIDER-MAN
-        grupoParticulas = new THREE.Group();
-        const geometriaEsfera = new THREE.SphereGeometry(0.03, 16, 16);
-        const colores = [0xe62429, 0xffdf38, 0x0866c6, 0xffffff];
-
-        for (let i = 0; i < 40; i++) {
-          const material = new THREE.MeshBasicMaterial({
-            color: colores[Math.floor(Math.random() * colores.length)],
-            transparent: true,
-            opacity: 0.8
-          });
-          const esfera = new THREE.Mesh(geometriaEsfera, material);
-          
-          esfera.position.set(
-            (Math.random() - 0.5) * 0.8,
-            Math.random() * 0.7 + 0.1,
-            (Math.random() - 0.5) * 0.8
-          );
-          
-          // Guardamos velocidad de flotación en cada esfera
-          esfera.userData = {
-            velocidadY: (Math.random() - 0.5) * 0.005,
-            velocidadX: (Math.random() - 0.5) * 0.003
-          };
-
-          grupoParticulas.add(esfera);
-        }
-        anchor.group.add(grupoParticulas);
-
         renderer.setAnimationLoop(() => {
-          // Animar las bolitas flotando suavemente
-          if (grupoParticulas) {
-            grupoParticulas.children.forEach(p => {
-              p.position.y += p.userData.velocidadY;
-              p.position.x += p.userData.velocidadX;
-              if (p.position.y > 0.8 || p.position.y < 0.05) p.userData.velocidadY *= -1;
-              if (Math.abs(p.position.x) > 0.5) p.userData.velocidadX *= -1;
-            });
-          }
           renderer.render(scene, camera);
         });
 
@@ -1178,6 +1139,7 @@ function setup() {
           } catch (_) {}
 
           experiencia = null;
+          contenedor.innerHTML = '';
         }
 
         boton.disabled = false;
@@ -1199,6 +1161,7 @@ function setup() {
         experiencia = null;
       }
 
+      contenedor.innerHTML = '';
       iniciando = false;
       boton.disabled = false;
       pantalla.style.display = 'flex';
@@ -1213,5 +1176,15 @@ function setup() {
       }
     });
   `;
-  document.head.appendChild(moduloAR);
+
+  document.body.appendChild(moduloAR);
+
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape' && overlayAR.style.display === 'block') {
+      cerrarAR();
+    }
+  });
+}
+
+function draw() {
 }
