@@ -462,20 +462,9 @@ function setup() {
     z-index: 2 !important;
   }
 
-  /* CANVAS DE PARTICULAS SUPERPUESTO DENTRO DE LA RA */
-  #particulas-canvas {
-    display: none;
-    position: absolute !important;
-    inset: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    z-index: 10 !important;
-    pointer-events: auto !important;
-  }
-
   .ar-inicio {
     position: absolute;
-    z-index: 20;
+    z-index: 5;
     inset: 0;
     display: flex;
     align-items: center;
@@ -518,7 +507,7 @@ function setup() {
 
   .ar-hud {
     position: absolute;
-    z-index: 20;
+    z-index: 6;
     top: 0;
     left: 0;
     right: 0;
@@ -541,7 +530,7 @@ function setup() {
 
   #ar-cerrar {
     position: absolute;
-    z-index: 25;
+    z-index: 7;
     display: none;
     bottom: 20px;
     left: 50%;
@@ -963,10 +952,7 @@ function setup() {
   </footer>
 
   <div id="ar-overlay" aria-hidden="true">
-    <div id="ar-container">
-      <!-- CANVAS DE PARTICULAS DENTRO DEL CONTENEDOR AR -->
-      <canvas id="particulas-canvas"></canvas>
-    </div>
+    <div id="ar-container"></div>
 
     <div class="ar-inicio" id="ar-inicio">
       <div class="ar-inicio-panel">
@@ -1003,180 +989,6 @@ function setup() {
   const inicioAR = document.querySelector('#ar-inicio');
   const hudAR = document.querySelector('#ar-hud');
   const mensajeAR = document.querySelector('#ar-mensaje');
-  const canvasParticulas = document.querySelector('#particulas-canvas');
-  const ctxParticulas = canvasParticulas.getContext('2d');
-
-  let anchoPantalla = window.innerWidth;
-  let altoPantalla = window.innerHeight;
-
-  function ajustarCanvas() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    anchoPantalla = window.innerWidth;
-    altoPantalla = window.innerHeight;
-    canvasParticulas.width = anchoPantalla * dpr;
-    canvasParticulas.height = altoPantalla * dpr;
-    ctxParticulas.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-  window.addEventListener('resize', ajustarCanvas);
-  ajustarCanvas();
-
-  const particulas = [];
-  const cantidadParticulas = 65;
-
-  function crearParticula(x, y, explosion = false) {
-    return {
-      x: x,
-      y: y,
-      vx: (Math.random() - 0.5) * (explosion ? 9 : 0.7),
-      vy: (Math.random() - 0.5) * (explosion ? 9 : 0.7),
-      radio: explosion ? Math.random() * 3 + 1 : Math.random() * 5 + 3,
-      vida: explosion ? 1 : Infinity,
-      color: Math.random() > 0.5 ? '#e62429' : '#ffffff',
-      explosion: explosion
-    };
-  }
-
-  for (let i = 0; i < cantidadParticulas; i++) {
-    particulas.push(
-      crearParticula(
-        Math.random() * anchoPantalla,
-        Math.random() * altoPantalla
-      )
-    );
-  }
-
-  function explotar(x, y) {
-    for (let i = 0; i < 18; i++) {
-      particulas.push(crearParticula(x, y, true));
-    }
-  }
-
-  let impacto = null;
-  let animandoParticulas = false;
-
-  function actualizarParticulas() {
-    if (!animandoParticulas) return;
-    ctxParticulas.clearRect(0, 0, anchoPantalla, altoPantalla);
-    for (let i = particulas.length - 1; i >= 0; i--) {
-      const p = particulas[i];
-      p.x += p.vx;
-      p.y += p.vy;
-
-      if (p.explosion) {
-        p.vida -= 0.018;
-        p.vx *= 0.98;
-        p.vy *= 0.98;
-        if (p.vida <= 0) {
-          particulas.splice(i, 1);
-          continue;
-        }
-      } else {
-        p.vx += (Math.random() - 0.5) * 0.025;
-        p.vy += (Math.random() - 0.5) * 0.025;
-        p.vx *= 0.99;
-        p.vy *= 0.99;
-        p.vx = Math.max(-0.8, Math.min(0.8, p.vx));
-        p.vy = Math.max(-0.8, Math.min(0.8, p.vy));
-
-        if (p.x < -10) p.x = anchoPantalla + 10;
-        if (p.x > anchoPantalla + 10) p.x = -10;
-        if (p.y < -10) p.y = altoPantalla + 10;
-        if (p.y > altoPantalla + 10) p.y = -10;
-      }
-
-      ctxParticulas.beginPath();
-      ctxParticulas.arc(p.x, p.y, p.radio, 0, Math.PI * 2);
-      ctxParticulas.fillStyle = p.color;
-      ctxParticulas.globalAlpha = p.explosion ? p.vida : 0.75;
-      ctxParticulas.shadowBlur = 12;
-      ctxParticulas.shadowColor = p.color;
-      ctxParticulas.fill();
-      ctxParticulas.globalAlpha = 1;
-      ctxParticulas.shadowBlur = 0;
-    }
-
-    ctxParticulas.lineWidth = 0.6;
-    for (let i = 0; i < particulas.length; i++) {
-      for (let j = i + 1; j < particulas.length; j++) {
-        const a = particulas[i];
-        const b = particulas[j];
-        const distancia = Math.hypot(a.x - b.x, a.y - b.y);
-
-        if (distancia < 110 && !a.explosion && !b.explosion) {
-          const alfa = 1 - distancia / 110;
-          ctxParticulas.beginPath();
-          ctxParticulas.moveTo(a.x, a.y);
-          ctxParticulas.lineTo(b.x, b.y);
-          ctxParticulas.strokeStyle = `rgba(120, 170, 230, ${alfa * 0.4})`;
-          ctxParticulas.stroke();
-        }
-      }
-    }
-
-    if (impacto) {
-      impacto.progreso += 0.035;
-      const t = Math.min(impacto.progreso, 1);
-      const x = impacto.inicio.x + (impacto.destino.x - impacto.inicio.x) * t;
-      const y = impacto.inicio.y + (impacto.destino.y - impacto.inicio.y) * t;
-
-      ctxParticulas.beginPath();
-      ctxParticulas.arc(x, y, 8, 0, Math.PI * 2);
-      ctxParticulas.fillStyle = '#ffdf38';
-      ctxParticulas.shadowBlur = 20;
-      ctxParticulas.shadowColor = '#e62429';
-      ctxParticulas.fill();
-      ctxParticulas.shadowBlur = 0;
-
-      if (t >= 1) {
-        explotar(x, y);
-        impacto = null;
-      }
-    }
-    requestAnimationFrame(actualizarParticulas);
-  }
-
-  // Interacción de clic dentro de la RA para disparar partículas
-  window.addEventListener('click', function(event) {
-    if (!animandoParticulas) return;
-    if (impacto) return;
-    if (event.target.closest('button')) return;
-
-    const x = event.clientX;
-    const y = event.clientY;
-    let seleccionada = null;
-    let menorDistancia = 50;
-
-    particulas.forEach(function(p) {
-      if (p.explosion) return;
-      const distancia = Math.hypot(p.x - x, p.y - y);
-      if (distancia < menorDistancia) {
-        menorDistancia = distancia;
-        seleccionada = p;
-      }
-    });
-    if (!seleccionada) return;
-
-    let objetivo = null;
-    let distanciaObjetivo = Infinity;
-    particulas.forEach(function(p) {
-      if (p === seleccionada || p.explosion) return;
-      const distancia = Math.hypot(p.x - seleccionada.x, p.y - seleccionada.y);
-      if (distancia < distanciaObjetivo) {
-        distanciaObjetivo = distancia;
-        objetivo = p;
-      }
-    });
-    if (!objetivo) return;
-
-    impacto = {
-      inicio: { x: seleccionada.x, y: seleccionada.y },
-      destino: { x: objetivo.x, y: objetivo.y },
-      progreso: 0
-    };
-
-    particulas.splice(particulas.indexOf(seleccionada), 1);
-    particulas.splice(particulas.indexOf(objetivo), 1);
-  });
 
   const mostrarAR = function() {
     overlayAR.style.display = 'block';
@@ -1194,8 +1006,6 @@ function setup() {
     inicioAR.style.display = 'flex';
     hudAR.style.display = 'none';
     botonCerrarAR.style.display = 'none';
-    canvasParticulas.style.display = 'none';
-    animandoParticulas = false;
   };
 
   if (abrirAR) abrirAR.addEventListener('click', mostrarAR);
@@ -1226,10 +1036,10 @@ function setup() {
     const estado = document.querySelector('#ar-estado');
     const botonCerrar = document.querySelector('#ar-cerrar');
     const contenedor = document.querySelector('#ar-container');
-    const canvasParticulas = document.querySelector('#particulas-canvas');
 
     let experiencia = null;
     let iniciando = false;
+    let grupoParticulas = null;
 
     async function iniciarExperiencia() {
       if (iniciando || experiencia) return;
@@ -1263,18 +1073,14 @@ function setup() {
         const anchor = experiencia.addAnchor(0);
 
         anchor.onTargetFound = () => {
-          estado.textContent = '¡PÁGINA RECONOCIDA! Spider-Man está sobre el cómic.';
-          // MOSTRAR Y ACTIVAR LAS PARTÍCULAS ENCIMA DE LA CÁMARA
-          canvasParticulas.style.display = 'block';
-          window.animandoParticulas = true;
-          if (typeof actualizarParticulas === 'function') actualizarParticulas();
+          estado.textContent = '¡PÁGINA RECONOCIDA! Spider-Man y las partículas están sobre el cómic.';
         };
 
         anchor.onTargetLost = () => {
           estado.textContent = 'No veo la página. Volvé a apuntar a la historieta.';
         };
 
-        mensaje.textContent = 'Aceptá el permiso de cámara si aparece. Estamos preparando Spider-Man…';
+        mensaje.textContent = 'Aceptá el permiso de cámara si aparece. Estamos preparando todo…';
 
         const loader = new GLTFLoader();
         const promesaCamara = experiencia.start();
@@ -1304,7 +1110,45 @@ function setup() {
 
         anchor.group.add(modelo);
 
+        // CREAR LAS BOLITAS DE COLORES EN 3D FLOTANDO ALREDEDOR DE SPIDER-MAN
+        grupoParticulas = new THREE.Group();
+        const geometriaEsfera = new THREE.SphereGeometry(0.03, 16, 16);
+        const colores = [0xe62429, 0xffdf38, 0x0866c6, 0xffffff];
+
+        for (let i = 0; i < 40; i++) {
+          const material = new THREE.MeshBasicMaterial({
+            color: colores[Math.floor(Math.random() * colores.length)],
+            transparent: true,
+            opacity: 0.8
+          });
+          const esfera = new THREE.Mesh(geometriaEsfera, material);
+          
+          esfera.position.set(
+            (Math.random() - 0.5) * 0.8,
+            Math.random() * 0.7 + 0.1,
+            (Math.random() - 0.5) * 0.8
+          );
+          
+          // Guardamos velocidad de flotación en cada esfera
+          esfera.userData = {
+            velocidadY: (Math.random() - 0.5) * 0.005,
+            velocidadX: (Math.random() - 0.5) * 0.003
+          };
+
+          grupoParticulas.add(esfera);
+        }
+        anchor.group.add(grupoParticulas);
+
         renderer.setAnimationLoop(() => {
+          // Animar las bolitas flotando suavemente
+          if (grupoParticulas) {
+            grupoParticulas.children.forEach(p => {
+              p.position.y += p.userData.velocidadY;
+              p.position.x += p.userData.velocidadX;
+              if (p.position.y > 0.8 || p.position.y < 0.05) p.userData.velocidadY *= -1;
+              if (Math.abs(p.position.x) > 0.5) p.userData.velocidadX *= -1;
+            });
+          }
           renderer.render(scene, camera);
         });
 
